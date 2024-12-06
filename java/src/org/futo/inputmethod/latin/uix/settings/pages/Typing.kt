@@ -60,6 +60,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.futo.inputmethod.latin.AudioAndHapticFeedbackManager
 import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.settings.LongPressKey
 import org.futo.inputmethod.latin.settings.LongPressKeyLayoutSetting
@@ -447,6 +448,7 @@ private fun AutoSpacesSetting() {
 fun TypingScreen(navController: NavHostController = rememberNavController()) {
     val context = LocalContext.current
     val (vibration, _) = useDataStore(key = vibrationDurationSetting.key, default = vibrationDurationSetting.default)
+    val enhancedVibrationSupported = remember { AudioAndHapticFeedbackManager.isEnhancedHapticFeedbackSupported() }
 
     LaunchedEffect(vibration) {
         val sharedPrefs = PreferenceUtils.getDefaultSharedPreferences(context)
@@ -601,6 +603,8 @@ fun TypingScreen(navController: NavHostController = rememberNavController()) {
             indicator = {
                 if(it == -1) {
                     "Default"
+                } else if (enhancedVibrationSupported) {
+                    "$it %"
                 } else {
                     "$it ms"
                 }

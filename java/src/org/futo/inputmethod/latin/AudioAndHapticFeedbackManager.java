@@ -18,6 +18,8 @@ package org.futo.inputmethod.latin;
 
 import android.content.Context;
 import android.media.AudioManager;
+import android.os.Build;
+import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
@@ -34,6 +36,8 @@ import org.futo.inputmethod.latin.settings.SettingsValues;
 public final class AudioAndHapticFeedbackManager {
     private AudioManager mAudioManager;
     private Vibrator mVibrator;
+    private VibrationEffect mVibrationEffect;
+    private VibrationEffect mVibrationEffectLight;
 
     private SettingsValues mSettingsValues;
     private boolean mSoundOn;
@@ -82,6 +86,34 @@ public final class AudioAndHapticFeedbackManager {
         return mAudioManager.getRingerMode() == AudioManager.RINGER_MODE_NORMAL;
     }
 
+    public static boolean isEnhancedHapticFeedbackSupported() {
+        if (sInstance.mVibrator != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            int primitiveId = VibrationEffect.Composition.PRIMITIVE_CLICK;
+            return sInstance.mVibrator.areAllPrimitivesSupported(primitiveId);
+        }
+        return false;
+    }
+
+    private void updateVibrationEffects() {
+        if (mSettingsValues == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return;
+        }
+        float strength = Math.min((float) mSettingsValues.mKeypressVibrationDuration / 100, 1);
+        if (strength >= 0 && isEnhancedHapticFeedbackSupported()) {
+            int primitiveId = VibrationEffect.Composition.PRIMITIVE_CLICK;
+            mVibrationEffect = VibrationEffect.startComposition()
+                    .addPrimitive(primitiveId, strength)
+                    .compose();
+            mVibrationEffectLight = VibrationEffect.startComposition()
+                    .addPrimitive(primitiveId, strength / 2)
+                    .compose();
+            return;
+        }
+
+        mVibrationEffect = null;
+        mVibrationEffectLight = null;
+    }
+
     public void performAudioFeedback(final int code) {
         // if mAudioManager is null, we can't play a sound anyway, so return
         if (mAudioManager == null) {
@@ -112,6 +144,15 @@ public final class AudioAndHapticFeedbackManager {
         if (!mSettingsValues.mVibrateOn) {
             return;
         }
+        // Use enhanced haptic feedback if available
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            VibrationEffect vibrationEffect = repeatKey ? mVibrationEffectLight : mVibrationEffect;
+            if (vibrationEffect != null)
+            {
+                mVibrator.vibrate(vibrationEffect);
+                return;
+            }
+        }
         if (mSettingsValues.mKeypressVibrationDuration >= 0) {
             vibrate(mSettingsValues.mKeypressVibrationDuration / (repeatKey ? 2 : 1));
             return;
@@ -126,6 +167,7 @@ public final class AudioAndHapticFeedbackManager {
     public void onSettingsChanged(final SettingsValues settingsValues) {
         mSettingsValues = settingsValues;
         mSoundOn = reevaluateIfSoundIsOn();
+        updateVibrationEffects();
     }
 
     public void onRingerModeChanged() {
